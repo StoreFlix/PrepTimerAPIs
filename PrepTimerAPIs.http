@@ -1,0 +1,6 @@
+@ServiceFabricAPIsOld_HostAddress = http://localhost:5113
+
+GET {{ServiceFabricAPIsOld_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

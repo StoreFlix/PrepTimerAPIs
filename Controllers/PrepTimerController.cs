@@ -37,6 +37,8 @@ namespace ServiceFabricApp.API.Controllers
         public PrepTimerController(IConfiguration _configuration)
         {
             Configuration = _configuration;
+
+
         }
 
         [EnableCors("customPolicy")]
@@ -156,7 +158,8 @@ namespace ServiceFabricApp.API.Controllers
         [EnableCors("customPolicy")]
         [Route("AddUpdateCondimentLanguage")]
         [HttpPost]
-        public bool AddUpdateCondimentLanguage(AddUpdateCondimentLanguagesRequest addUpdateCondimentLanguagesRequest)
+        [Consumes("multipart/form-data")]
+        public IActionResult AddUpdateCondimentLanguage([FromForm]AddUpdateCondimentLanguagesRequest addUpdateCondimentLanguagesRequest)
         {
             bool isAddedSuccessfully = false;
             try
@@ -171,20 +174,39 @@ namespace ServiceFabricApp.API.Controllers
                 if (!String.IsNullOrEmpty(Request.Headers["Userid"]))
                     UserId = Convert.ToInt32(Request.Headers["Userid"]);
 
+                if (addUpdateCondimentLanguagesRequest.LangFile == null || addUpdateCondimentLanguagesRequest.LangFile.Length == 0)
+                {
+                    return BadRequest("File is required.");
+                }
+
+                String FileNameToUpload = String.Empty; FileNameToUpload = addUpdateCondimentLanguagesRequest.LangFile.Name;
+
+                if (HttpContext.Request.Form.Files.Count() > 0)
+                {
+                    string GUID = System.Guid.NewGuid().ToString();
+                    string extension = Path.GetExtension(addUpdateCondimentLanguagesRequest.LangFile.FileName);
+                    FileNameToUpload = GUID + "_" + Path.GetFileNameWithoutExtension(addUpdateCondimentLanguagesRequest.LangFile.FileName) + extension;
+
+                    FileNameToUpload = "PrepTimer/Translations/" + FileNameToUpload;
+                }
+                string filepath = addUpdateCondimentLanguagesRequest.FilePath;
+                if (HttpContext.Request.Form.Files.Count() > 0)
+                    filepath = UpLoadFile(FileNameToUpload).Result;
+
+                addUpdateCondimentLanguagesRequest.FilePath = filepath;
+
                 //Getting the connection string from appsettings.json which is included in Starup.cs
                 string strSqlConnection = Configuration.GetConnectionString("DefaultConnection");
 
                 using (SqlConnection connection = new SqlConnection(strSqlConnection))
                 {
                     //Calling the stored procedure with all the required paramaters 
-                    SqlCommand cmd = new SqlCommand(Keys.SL_PT_AddCondimentLanguages, connection);
+                    SqlCommand cmd = new SqlCommand(Keys.PT_AddCondimentLanguages, connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.CommandTimeout = 300;
-
-                    cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = CompanyId;
-                    cmd.Parameters.Add("@UserId", SqlDbType.Int).Value = UserId;
-                    cmd.Parameters.Add("@LangId", SqlDbType.Int).Value = addUpdateCondimentLanguagesRequest.LangId;
-                    cmd.Parameters.Add("@LangName", SqlDbType.NVarChar).Value = addUpdateCondimentLanguagesRequest.LangName;
+                   
+                    cmd.Parameters.Add("@LangId", SqlDbType.Int).Value = addUpdateCondimentLanguagesRequest.Id;
+                    cmd.Parameters.Add("@LangName", SqlDbType.NVarChar).Value = addUpdateCondimentLanguagesRequest.Name;
                     cmd.Parameters.Add("@Locale", SqlDbType.NVarChar).Value = addUpdateCondimentLanguagesRequest.Locale;
                     cmd.Parameters.Add("@FilePath", SqlDbType.NVarChar).Value = addUpdateCondimentLanguagesRequest.FilePath;
 
@@ -202,7 +224,7 @@ namespace ServiceFabricApp.API.Controllers
             {
                 Common.WriteLog("PrepTimerController", "AddUpdateCondimentLanguage", ex.Message);
             }
-            return isAddedSuccessfully;
+            return Ok(isAddedSuccessfully);
         }
 
 
@@ -230,12 +252,12 @@ namespace ServiceFabricApp.API.Controllers
                 using (SqlConnection connection = new SqlConnection(strSqlConnection))
                 {
                     //Calling the stored procedure with all the required paramaters 
-                    SqlCommand cmd = new SqlCommand(Keys.SL_PT_GetLanguages, connection);
+                    SqlCommand cmd = new SqlCommand(Keys.PT_GetLanguages, connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.CommandTimeout = 300;
 
-                    cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = CompanyId;
-                    cmd.Parameters.Add("@UserId", SqlDbType.Int).Value = UserId;
+                    //cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = CompanyId;
+                    //cmd.Parameters.Add("@UserId", SqlDbType.Int).Value = UserId;
 
                     connection.Open();
                     using (SqlDataAdapter sda = new SqlDataAdapter(cmd))
@@ -380,6 +402,35 @@ namespace ServiceFabricApp.API.Controllers
             return strUrl;
         }
 
+        private async Task<string> UpLoadFile(string FileNameToUpload)
+        {
+            string strUrl = string.Empty;
+            try
+            {
+                var companyLogo = HttpContext.Request.Form.Files[0];
+                string azureAccountName = Configuration.GetSection("Azure")["AccountName"];
+                string azureAccountKey = Configuration.GetSection("Azure")["AccountKey"];
+
+
+                StorageSharedKeyCredential storageCredentials = new StorageSharedKeyCredential(azureAccountName, azureAccountKey);
+                Uri blobUri = new Uri("https://" + azureAccountName + ".blob.core.windows.net/" + "storelynk" + "/" + FileNameToUpload);
+                BlobClient blobClient = new BlobClient(blobUri, storageCredentials);
+
+                strUrl = "https://" + azureAccountName + ".blob.core.windows.net/" + "storelynk" + "/" + FileNameToUpload;
+                using (var stream = new MemoryStream())
+                {
+                    await companyLogo.CopyToAsync(stream);
+                    stream.Position = 0;
+                    await blobClient.UploadAsync(stream);
+                }
+            }
+            catch (Exception ex)
+            {
+                Common.WriteLog("PrepTimerController", "UpLoadCondimentLogo", ex.Message);
+            }
+            return strUrl;
+        }
+
         [EnableCors("customPolicy")]
         [Route("GetCondimentCategoryMapping")]
         [HttpPost]
@@ -453,11 +504,10 @@ namespace ServiceFabricApp.API.Controllers
                 using (SqlConnection connection = new SqlConnection(strSqlConnection))
                 {
                     //Calling the stored procedure with all the required paramaters 
-                    SqlCommand cmd = new SqlCommand(Keys.SL_PT_GetLanguageById, connection);
+                    SqlCommand cmd = new SqlCommand(Keys.PT_GetLanguageById, connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.CommandTimeout = 300;
 
-                    cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = CompanyId;
                     cmd.Parameters.Add("@LangId", SqlDbType.Int).Value = LangId;
 
                     connection.Open();

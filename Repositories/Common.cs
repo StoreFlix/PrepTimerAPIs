@@ -355,6 +355,40 @@ namespace ServiceFabricApp.API.Repositories
                 return "";
             }
         }
+
+        public static string SFF_DECRYPT(string value)
+        {
+            byte[] KEY_64 = { 42, 16, 93, 156, 78, 4, 218, 32 };
+            byte[] IV_64 = { 55, 103, 246, 79, 36, 99, 167, 3 };
+            if (!string.IsNullOrEmpty(value))
+            {
+                try
+                {
+                    // value = MiscFunctions.SFF_REPLACE_STRING(value, "-", "+");
+
+                    using (DESCryptoServiceProvider cryptoProvider = new DESCryptoServiceProvider())
+                    {
+                        // Convert from string to byte array
+                        byte[] buffer = Convert.FromBase64String(value);
+
+                        using (MemoryStream ms = new MemoryStream(buffer))
+                        using (CryptoStream cs = new CryptoStream(ms, cryptoProvider.CreateDecryptor(KEY_64, IV_64), CryptoStreamMode.Read))
+                        using (StreamReader sr = new StreamReader(cs))
+                        {
+                            return sr.ReadToEnd();
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return "INVALID";
+                }
+            }
+            else
+            {
+                return "";
+            }
+        }
         public static void DeleteFilefromAzure(string Imagepath, string azureAccountName, string azureAccountKey)
         {
             try

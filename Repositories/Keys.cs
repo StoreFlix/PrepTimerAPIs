@@ -258,6 +258,11 @@ namespace ServiceFabricApp.API.Repositories
         public const string SL_PT_GetCondimentCategoryMappingById = "SL_PT_GetCondimentCategoryMappingById";
 
         public const string SL_PT_GetLanguageById = "SL_PT_GetLanguageById";
+
+        public const string PT_GetLanguages = "PT_GetLanguages";
+        public const string PT_AddCondimentLanguages = "PT_AddLanguages";
+        public const string PT_GetLanguageById = "PT_GetLanguageById";
+
         #endregion
 
         #region Register Equipment Types

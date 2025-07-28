@@ -66,12 +66,12 @@ namespace ServiceFabricApp.API.Model
         /// <summary>
         /// LangId
         /// </summary>
-        public int LangId { get; set; }
+        public int Id { get; set; }
 
         /// <summary>
         /// LangName
         /// </summary>
-        public string LangName { get; set; }
+        public string Name { get; set; }
 
         /// <summary>
         /// Locale
@@ -81,7 +81,12 @@ namespace ServiceFabricApp.API.Model
         /// <summary>
         /// FilePath
         /// </summary>
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
+
+        /// <summary>
+        /// FilePath
+        /// </summary>
+        public IFormFile? LangFile { get; set; }
     }
     #endregion
 

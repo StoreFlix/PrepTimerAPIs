@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using PrepTimerAPIs.Models;
 using PrepTimerAPIs.Dtos;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 
 namespace PrepTimerAPIs.Services
 {
@@ -13,11 +14,12 @@ namespace PrepTimerAPIs.Services
         private readonly StoreLynkDbProd01Context _context;
         private readonly IConfiguration _configuration;
 
-
-        public ItemService(StoreLynkDbProd01Context context, IConfiguration configuration)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        public ItemService(StoreLynkDbProd01Context context, IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
-            _configuration = configuration; 
+            _configuration = configuration;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<List<PTItemDto>> GetItemsAsync(int companyId)
@@ -50,41 +52,148 @@ namespace PrepTimerAPIs.Services
 
         public async Task AddItemAsync(ItemDto dto, IFormFile? ItemIcon)
         {
+
+            int companyId = GetCompanyIdFromToken();
+
+            // 1. Create the PTItem
             var item = new PTItem
             {
-                ItemName = dto.ItemName,
+                ItemName = dto.Translations[0].ItemName,   // fallback / default
                 Duration = dto.Duration,
-                CompanyId = 1,
+                CompanyId = companyId,
                 IsDefault = false,
                 CreatedOn = DateTime.UtcNow,
-                ModifiedOn = DateTime.UtcNow
+                ModifiedOn = DateTime.UtcNow,
+                IsActive = true
             };
 
-            if (ItemIcon != null)
+            if (dto.icon != null)
             {
-                item.IconName=ItemIcon.Name;
-                item.IconUrl = await UpLoadCompanyLogo(ItemIcon);
+                item.IconName= dto.icon.Name;
+                item.IconUrl = await UpLoadCompanyLogo(dto.icon);
+            }
+            await _context.PTItems.AddAsync(item);
+            await _context.SaveChangesAsync();
+
+            if (dto.Categories != null && dto.Categories.Any())
+            {
+                var categoryMappings = dto.Categories.Select(catId => new PTItemCategoryMapping
+                {
+                    ItemId = item.ItemId,
+                    CategoryId = catId,
+                    CreatedOn = DateTime.UtcNow,
+                    ModifiedOn = DateTime.UtcNow
+                }).ToList();
+
+                await _context.PTItemCategoryMapping.AddRangeAsync(categoryMappings);
             }
 
-            await _context.PTItems.AddAsync(item);
+            // 4. Insert Translations
+            if (dto.Translations != null && dto.Translations.Any())
+            {
+                var translationMappings = dto.Translations.Select(t => new PTItemTranslationMapping
+                {
+                    ItemId = item.ItemId,
+                    Locale = t.Locale,
+                    ItemName = t.ItemName,
+                    CreatedOn = DateTime.UtcNow,
+                    ModifiedOn = DateTime.UtcNow
+                }).ToList();
+
+                await _context.PTItemTranslationMapping.AddRangeAsync(translationMappings);
+            }
+
+            // 5. Save all changes
             await _context.SaveChangesAsync();
         }
 
-        public async Task<bool> UpdateItemAsync(ItemDto item, IFormFile? ItemIcon)
+        public async Task<ItemDto?> GetItemByIdAsync(int itemId)
         {
-            var existing = await _context.PTItems.FindAsync(item.ItemId);
+            int companyId = GetCompanyIdFromToken();
+
+            var item = await _context.PTItems
+                .Where(i => i.ItemId == itemId && i.CompanyId == companyId && i.IsActive)
+                .Select(i => new ItemDto
+                {
+                    ItemId = i.ItemId,
+                    Duration = i.Duration,
+                    IconUrl = i.IconUrl,
+                    IconName = i.IconName,
+                    Categories = _context.PTItemCategoryMapping
+                        .Where(m => m.ItemId == i.ItemId)
+                        .Select(m => m.CategoryId)
+                        .ToList(),
+
+                    Translations = _context.PTItemTranslationMapping
+                        .Where(t => t.ItemId == i.ItemId)
+                        .Select(t => new TranslationDto
+                        {
+                            Locale = t.Locale,
+                            ItemName = t.ItemName
+                        })
+                        .ToList()
+                })
+                .FirstOrDefaultAsync();
+
+            return item;
+        }
+
+        public async Task<bool> UpdateItemAsync(ItemDto dto, IFormFile? ItemIcon)
+        {
+            var existing = await _context.PTItems.FindAsync(dto.ItemId);
             if (existing == null) return false;
 
-            existing.ItemName = item.ItemName;
-            existing.Duration = item.Duration;
+            existing.ItemName = dto.ItemName;
+            existing.Duration = dto.Duration;
             existing.ModifiedOn = DateTime.UtcNow;
 
-            if (ItemIcon != null)
+            if (dto.Translations != null && dto.Translations.Any())
+            {
+                existing.ItemName = dto.Translations[0].ItemName;
+            }
+
+            if (dto.icon != null)
             {
                 existing.IconName = ItemIcon.Name;
-                existing.IconUrl = await UpLoadCompanyLogo(ItemIcon);
+                existing.IconUrl = await UpLoadCompanyLogo(dto.icon);
             }
             // If using a separate table for Store mappings, update logic here
+
+            var existingCategories = _context.PTItemCategoryMapping
+       .Where(x => x.ItemId == dto.ItemId);
+            _context.PTItemCategoryMapping.RemoveRange(existingCategories);
+
+            if (dto.Categories != null && dto.Categories.Any())
+            {
+                var categoryMappings = dto.Categories.Select(catId => new PTItemCategoryMapping
+                {
+                    ItemId = dto.ItemId.Value,
+                    CategoryId = catId,
+                    CreatedOn = DateTime.UtcNow,
+                    ModifiedOn = DateTime.UtcNow
+                }).ToList();
+
+                await _context.PTItemCategoryMapping.AddRangeAsync(categoryMappings);
+            }
+
+            // --- Update Translations ---
+            var existingTranslations = _context.PTItemTranslationMapping
+                .Where(x => x.ItemId == dto.ItemId);
+            _context.PTItemTranslationMapping.RemoveRange(existingTranslations);
+
+            if (dto.Translations != null && dto.Translations.Any())
+            {
+                var translationMappings = dto.Translations.Select(t => new PTItemTranslationMapping
+                {
+                    ItemId = dto.ItemId.Value,
+                    Locale = t.Locale,
+                    ItemName = t.ItemName,
+                    CreatedOn = DateTime.UtcNow,
+                    ModifiedOn = DateTime.UtcNow
+                }).ToList();
+
+                await _context.PTItemTranslationMapping.AddRangeAsync(translationMappings);
+            }
 
             await _context.SaveChangesAsync();
             return true;
@@ -95,8 +204,75 @@ namespace PrepTimerAPIs.Services
             var item = await _context.PTItems.FindAsync(id);
             if (item == null) return false;
 
+            var mappings = _context.PTItemTranslationMapping
+                            .Where(m => m.ItemId == id);
+
+            _context.PTItemTranslationMapping.RemoveRange(mappings);
+
+            await _context.SaveChangesAsync();
+
+            var ctgmappings = _context.PTItemCategoryMapping
+                          .Where(m => m.ItemId == id);
+
+            _context.PTItemCategoryMapping.RemoveRange(ctgmappings);
+
+            await _context.SaveChangesAsync();
+
+
             _context.PTItems.Remove(item);
             await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> CreateTestItem(CreateItemRequestDTO request)
+        {
+            if (string.IsNullOrWhiteSpace(request.ItemName) || request.CategoryIds == null || !request.CategoryIds.Any())
+                return false;
+
+            var now = DateTime.Now;
+
+            // Create item
+            var newItem = new PTItem
+            {
+                ItemName = request.ItemName,
+                IconName = "TestIcon1",
+                IconUrl = "https://slbackupstorage.blob.core.windows.net/storelynk/PrepTimer/ItemIcons/TestIcon1.jpg",
+                Duration = 10,
+                IsDefault = false,
+                IsActive = true,
+                CreatedOn = now,
+                ModifiedOn = now
+            };
+
+            _context.PTItems.Add(newItem);
+            await _context.SaveChangesAsync(); // Save to generate ItemId
+
+            // Add translations with same name
+            var locales = new[] { "en", "es", "fr", "zn", "pl", "de", "cz" };
+            var translations = locales.Select(locale => new PTItemTranslationMapping
+            {
+                ItemId = newItem.ItemId,
+                Locale = locale,
+                ItemName = request.ItemName,
+                CreatedOn = now,
+                ModifiedOn = now
+            }).ToList();
+
+            _context.PTItemTranslationMapping.AddRange(translations);
+
+            // Add categories
+            var categoryMappings = request.CategoryIds.Select(catId => new PTItemCategoryMapping
+            {
+                ItemId = newItem.ItemId,
+                CategoryId = catId,
+                CreatedOn = now,
+                ModifiedOn = now
+            }).ToList();
+
+            _context.PTItemCategoryMapping.AddRange(categoryMappings);
+
+            await _context.SaveChangesAsync();
+
             return true;
         }
         private async Task<string> UpLoadCompanyLogo(IFormFile ItemIcon)
@@ -132,6 +308,22 @@ namespace PrepTimerAPIs.Services
                 return string.Empty;
             }
             return strUrl;
+        }
+
+        private int GetCompanyIdFromToken()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null) throw new UnauthorizedAccessException("User context not found.");
+
+            var claim = user.Claims.FirstOrDefault(c => c.Type == "clientName");
+            if (claim == null) throw new UnauthorizedAccessException("CompanyId not found in token.");
+            var userDetails = _context.PTUsers.FirstOrDefault(a => a.Email.ToLower().Trim() == claim.Value.ToLower().Trim());
+
+            var CompanyId = 1;
+            if (userDetails != null)
+                CompanyId = userDetails.CompanyId.Value;
+
+            return CompanyId;
         }
     }
 }

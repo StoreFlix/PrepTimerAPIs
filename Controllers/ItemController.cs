@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PrepTimerAPIs.Dtos;
 using PrepTimerAPIs.Models;
@@ -6,6 +8,7 @@ using PrepTimerAPIs.Services;
 
 namespace PrepTimerAPIs.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class ItemController : ControllerBase
@@ -25,6 +28,16 @@ namespace PrepTimerAPIs.Controllers
             return Ok(categories);
         }
 
+        [HttpGet]
+        [EnableCors("customPolicy")]
+        [Route("GetItemDetailsById/{itemId}")]
+        public async Task<IActionResult> Get(int itemId)
+        {
+            var itemDetails = await _service.GetItemByIdAsync(itemId);
+            return Ok(itemDetails);
+        }
+
+
         [HttpPost]
         public async Task<IActionResult> AddItem([FromForm] ItemDto dto, IFormFile? logo)
         {
@@ -36,8 +49,7 @@ namespace PrepTimerAPIs.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateItem(int id, [FromForm] ItemDto dto, IFormFile? logo)
         {
-            if (id != dto.ItemId)
-                return BadRequest("Item ID mismatch");
+            dto.ItemId = id;
 
             var result = await _service.UpdateItemAsync(dto, logo);
 
@@ -57,6 +69,13 @@ namespace PrepTimerAPIs.Controllers
                 return NotFound();
 
             return NoContent();
+        }
+
+        [HttpPost("test-item-create")]
+        public async Task<IActionResult> CreateTestItem([FromBody] CreateItemRequestDTO request)
+        {
+            await _service.CreateTestItem(request);
+            return Ok(new { message = "Item added successfully." });
         }
     }
 }

@@ -14,7 +14,7 @@ builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IUserService, UserService>();
-
+builder.Services.AddScoped<IEmailService, EmailService>();
 // Add services to the container.
 
 var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]);
@@ -48,6 +48,7 @@ builder.Services.AddCors(options=>
     });
 });
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c=>
@@ -65,7 +66,7 @@ app.UseHttpsRedirection();
 
 app.UseCors("customPolicy");
 
-
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

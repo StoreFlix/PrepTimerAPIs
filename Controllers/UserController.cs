@@ -87,6 +87,9 @@ namespace ServiceFabricAPIsOld.Controllers
                     cmd.Parameters.Add("@DeviceType", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceType;
                     cmd.Parameters.Add("@DeviceOS", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceOS;
                     cmd.Parameters.Add("@DeviceIMEI", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceIMEI;
+                    cmd.Parameters.Add("@DeviceModel", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceModel;
+                    cmd.Parameters.Add("@DeviceManufacturer", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceManufacturer;
+
 
 
                     using (SqlDataReader dbReader = await cmd.ExecuteReaderAsync())
@@ -108,14 +111,24 @@ namespace ServiceFabricAPIsOld.Controllers
                 var accessToken = tokenSVC.GenerateAccessToken(loginModel.UserDetails.Email);
                 var refreshToken = tokenSVC.GenerateRefreshToken();
 
-                var _translations = await _ctservice.GetTranslations();
-                var _categories = await _ctservice.GetCategoriesAsync(1);
-                var _items = await _itemservice.GetItemsAsync(1);
+                if (loginModel.UserDetails.Email.Contains("antunes"))
+                {
+                    var _translations = await _ctservice.GetTranslations();
+                    var _categories = await _ctservice.GetCategoriesAsync(1);
+                    var _items = await _itemservice.GetItemsAsync(1);
+                    return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
+                }
 
-                return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate= subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
+                //var _translations = await _ctservice.GetTranslations();
+                //var _categories = await _ctservice.GetCategoriesAsync(1);
+                //var _items = await _itemservice.GetItemsAsync(1);
+
+                //return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate= subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
+                return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate });
+
             }
 
-            
+
         }
 
 
@@ -184,12 +197,34 @@ namespace ServiceFabricAPIsOld.Controllers
 
 
         }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
+        {
+            var result = await _service.ResetPasswordAsync(model.Token, model.NewPassword);
+
+            if (!result.IsSuccess)
+                return BadRequest(result.Message);
+
+            return Ok(result.Message);
+        }
+
+        [HttpPost("request-reset-password")]
+        public async Task<IActionResult> RequestResetPassword([FromBody] ResetPasswordRequestDto request)
+        {
+            var result = await _service.RequestPasswordResetAsync(request.Email);
+
+            if (!result.IsSuccess)
+                return NotFound(result.Message);
+
+            return Ok(result.Message);
+        }
+
         [Route("GetPassword")]
         [HttpGet]
-
         public async Task<IActionResult> GetPassword(string password)
         {
-            var result = await _service.ResetPassword(password);
+            var result = await _service.HashPassword(password);
 
             if (String.IsNullOrWhiteSpace(result))
                 return NotFound();

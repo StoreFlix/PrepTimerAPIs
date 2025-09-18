@@ -174,21 +174,22 @@ namespace ServiceFabricApp.API.Controllers
                 if (!String.IsNullOrEmpty(Request.Headers["Userid"]))
                     UserId = Convert.ToInt32(Request.Headers["Userid"]);
 
-                if (addUpdateCondimentLanguagesRequest.LangFile == null || addUpdateCondimentLanguagesRequest.LangFile.Length == 0)
+                if (addUpdateCondimentLanguagesRequest.Id == 0 && (addUpdateCondimentLanguagesRequest.LangFile == null || addUpdateCondimentLanguagesRequest.LangFile.Length == 0))
                 {
                     return BadRequest("File is required.");
                 }
 
-                String FileNameToUpload = String.Empty; FileNameToUpload = addUpdateCondimentLanguagesRequest.LangFile.Name;
-
+                String FileNameToUpload = String.Empty; 
                 if (HttpContext.Request.Form.Files.Count() > 0)
                 {
                     string GUID = System.Guid.NewGuid().ToString();
+                    FileNameToUpload = addUpdateCondimentLanguagesRequest.LangFile.Name;
                     string extension = Path.GetExtension(addUpdateCondimentLanguagesRequest.LangFile.FileName);
                     FileNameToUpload = GUID + "_" + Path.GetFileNameWithoutExtension(addUpdateCondimentLanguagesRequest.LangFile.FileName) + extension;
 
                     FileNameToUpload = "PrepTimer/Translations/" + FileNameToUpload;
                 }
+
                 string filepath = addUpdateCondimentLanguagesRequest.FilePath;
                 if (HttpContext.Request.Form.Files.Count() > 0)
                     filepath = UpLoadFile(FileNameToUpload).Result;
@@ -528,6 +529,49 @@ namespace ServiceFabricApp.API.Controllers
                 Common.WriteLog("PrepTimerController", "GetLanguageById", ex.Message);
             }
             return lstLanguagesResponse;
+        }
+
+        [EnableCors("customPolicy")]
+        [Route("DeleteLanguageById")]
+        [HttpPost]
+        public bool DeleteLanguageById(int LangId)
+        {
+
+            bool isDeletedSuccessfully = false;
+            try
+            {
+                //CompanyId will get it from header token
+                int CompanyId = 0;
+                if (!String.IsNullOrEmpty(Request.Headers["CompanyId"]))
+                    CompanyId = Convert.ToInt32(Request.Headers["CompanyId"]);
+
+                //Getting the connection string from appsettings.json which is included in Starup.cs
+                string strSqlConnection = Configuration.GetConnectionString("DefaultConnection");
+
+                using (SqlConnection connection = new SqlConnection(strSqlConnection))
+                {
+                    //Calling the stored procedure with all the required paramaters 
+                    SqlCommand cmd = new SqlCommand("PT_DeleteLanguage", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.CommandTimeout = 300;
+
+                    cmd.Parameters.Add("@LangId", SqlDbType.Int).Value = LangId;
+
+                    connection.Open();
+                    using (SqlDataReader dbReader = cmd.ExecuteReader())
+                    {
+                        while (dbReader.Read())
+                        {
+                            isDeletedSuccessfully = Convert.ToString(dbReader["SPResult"]) == "1" ? true : false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)  //Logging the Error into file while exception
+            {
+                Common.WriteLog("PrepTimerController", "GetLanguageById", ex.Message);
+            }
+            return isDeletedSuccessfully;
         }
 
 

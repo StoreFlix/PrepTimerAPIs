@@ -7,6 +7,7 @@ using PrepTimerAPIs.Services;
 
 namespace PrepTimerAPIs.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class CategoryController : ControllerBase
@@ -52,12 +53,19 @@ namespace PrepTimerAPIs.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCategory(int id)
         {
-            var result = await _service.DeleteCategoryAsync(id);
+            try
+            {
+                var result = await _service.DeleteCategoryAsync(id);
 
-            if (!result)
-                return NotFound();
+                if (!result)
+                    return NotFound();
 
-            return NoContent();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
     }
 

@@ -32,7 +32,7 @@ namespace ServiceFabricAPIsOld.Repositories
                 issuer: Configuration["Jwt:Issuer"],
                 audience: Configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(30),
+                expires: DateTime.Now.AddMinutes(1440),
                 signingCredentials: creds
             );
 

@@ -9,5 +9,8 @@ namespace PrepTimerAPIs.Services
         Task AddItemAsync(ItemDto dto, IFormFile? ItemIcon);
         Task<bool> UpdateItemAsync(ItemDto dto, IFormFile? ItemIcon);
         Task<bool> DeleteItemAsync(int id);
+        Task<bool> CreateTestItem(CreateItemRequestDTO request);
+
+        Task<ItemDto> GetItemByIdAsync(int id);
     }
 }

@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using PrepTimerAPIs.Dtos;
 using PrepTimerAPIs.Models;
+using ServiceFabricApp.API.Repositories;
 using System.ComponentModel.Design;
 using System.Security.Cryptography;
 
@@ -11,12 +12,13 @@ namespace PrepTimerAPIs.Services
     {
         private readonly StoreLynkDbProd01Context _context;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
 
-
-        public UserService(StoreLynkDbProd01Context context, IConfiguration configuration)
+        public UserService(StoreLynkDbProd01Context context, IConfiguration configuration, IEmailService emailService)
         {
             _context = context;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         public async Task<List<PTUser>> GetUsersAsync(int companyId)
@@ -71,7 +73,47 @@ namespace PrepTimerAPIs.Services
             return true;
         }
 
-        public async Task<string> ResetPassword(string password)
+        public async Task<ResponseResult> RequestPasswordResetAsync(string email)
+        {
+            var user = await _context.PTUsers.FirstOrDefaultAsync(x => x.Email == email);
+            if (user == null)
+                return ResponseResult.Failure("User not found.");
+
+            var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+            user.ResetPasswordToken = token;
+            user.ResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+
+            await _context.SaveChangesAsync();
+
+            var frontendUrl = _configuration["AppSettings:FrontendUrl"];
+            var resetLink = $"{frontendUrl}/reset-password?token={token}";
+
+            await _emailService.SendEmailAsync(
+                user.Email,
+                "Reset your password",
+                $"Click the link to reset your password: <a href='{resetLink}'>Reset Password</a>"
+            );
+
+            return ResponseResult.Success("Reset link sent.");
+        }
+
+        public async Task<ResponseResult> ResetPasswordAsync(string token, string newPassword)
+        {
+            var user = await _context.PTUsers.FirstOrDefaultAsync(x => x.ResetPasswordToken == token);
+
+            if (user == null || user.ResetTokenExpiry < DateTime.UtcNow)
+                return ResponseResult.Failure("Invalid or expired token.");
+
+            user.Password = Common.SFF_ENCRYPT(newPassword); 
+            user.ResetPasswordToken = null;
+            user.ResetTokenExpiry = null;
+
+            await _context.SaveChangesAsync();
+
+            return ResponseResult.Success("Password has been reset.");
+        }
+
+        public async Task<string> HashPassword(string password)
         {
             byte[] KEY_64 = { 42, 16, 93, 156, 78, 4, 218, 32 };
             byte[] IV_64 = { 55, 103, 246, 79, 36, 99, 167, 3 };

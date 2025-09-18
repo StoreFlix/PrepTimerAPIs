@@ -5,11 +5,15 @@
         public int? ItemId { get; set; } // Nullable for Add
         public string ItemName { get; set; } = string.Empty;
 
-        public string Icon { get; set; } = string.Empty;
         public int Duration { get; set; }
-        public int CategoryId { get; set; }
+        public List<int>? Categories { get; set; }
+        public List<TranslationDto>? Translations { get; set; }
         public int? CompanyId { get; set; }
         public bool IsDefault { get; set; }
+
+        public string? IconName { get; set; }
+        public string? IconUrl { get; set; }
+        public IFormFile? icon { get; set; }
     }
 
     public class PTItemDto

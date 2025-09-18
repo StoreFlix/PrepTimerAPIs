@@ -35,5 +35,15 @@
         /// IMEI details
         /// </summary>
         public string? DeviceIMEI { get; set; }
+
+        /// <summary>
+        /// IMEI details
+        /// </summary>
+        public string? DeviceModel { get; set; }
+        /// <summary>
+        /// IMEI details
+        /// </summary>
+        public string? DeviceManufacturer { get; set; }
+
     }
 }

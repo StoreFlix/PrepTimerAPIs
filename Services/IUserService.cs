@@ -9,6 +9,8 @@ namespace PrepTimerAPIs.Services
         Task AddUserAsync(UserDto dto);
         Task<bool> UpdateUserAsync(PTUser user);
         Task<bool> DeleteUserAsync(int id);
-        Task<String> ResetPassword(string password);
+        Task<String> HashPassword(string password);
+        Task<ResponseResult> RequestPasswordResetAsync(string email);
+        Task<ResponseResult> ResetPasswordAsync(string token, string newPassword);
     }
 }

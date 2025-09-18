@@ -8,9 +8,12 @@ namespace PrepTimerAPIs.Services
     public class CategoryService : ICategoryService
     {
         private readonly StoreLynkDbProd01Context _context;
-        public CategoryService( StoreLynkDbProd01Context context)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public CategoryService( StoreLynkDbProd01Context context, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<List<CategoryDto>> GetCategoriesAsync(int companyId)
@@ -28,10 +31,11 @@ namespace PrepTimerAPIs.Services
 
         public async Task AddCategoryAsync(CreateCategoryDto dto)
         {
+            var companyId = GetCompanyIdFromToken();
             var category = new Ptcategory
             {
                 CategoryName = dto.CategoryName,
-                CompanyId = 1
+                CompanyId = companyId
             };
 
              await _context.Ptcategories.AddAsync(category);
@@ -68,7 +72,15 @@ namespace PrepTimerAPIs.Services
             var category = await _context.Ptcategories.FindAsync(id);
             if (category == null) return false;
 
+            var mappings = _context.PTItemCategoryMapping
+                            .Where(m => m.CategoryId == id);
+
+            _context.PTItemCategoryMapping.RemoveRange(mappings);
+
+            await _context.SaveChangesAsync();
+
             _context.Ptcategories.Remove(category);
+
             await _context.SaveChangesAsync();
             return true;
         }
@@ -78,6 +90,22 @@ namespace PrepTimerAPIs.Services
             var translations = await _context.Ptlanguages.ToListAsync();
             return translations;
            
+        }
+
+        private int GetCompanyIdFromToken()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null) throw new UnauthorizedAccessException("User context not found.");
+
+            var claim = user.Claims.FirstOrDefault(c => c.Type == "clientName");
+            if (claim == null) throw new UnauthorizedAccessException("CompanyId not found in token.");
+            var userDetails = _context.PTUsers.FirstOrDefault(a => a.Email.ToLower().Trim() == claim.Value.ToLower().Trim());
+
+            var CompanyId = 1;
+            if (userDetails != null)
+                CompanyId = userDetails.CompanyId.Value;
+
+            return CompanyId;
         }
 
     }

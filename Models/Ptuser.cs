@@ -31,6 +31,9 @@ public partial class PTUser
 
     public int? ModifiedBy { get; set; }
 
+    public string? ResetPasswordToken { get; set; }
+    public DateTime? ResetTokenExpiry { get; set; }
+
     public virtual Ptcompany? Company { get; set; }
 
     public virtual ICollection<PtactiveDevice> PtactiveDevices { get; set; } = new List<PtactiveDevice>();

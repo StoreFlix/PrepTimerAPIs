@@ -22,8 +22,8 @@ namespace PrepTimerAPIs.Controllers
         [HttpGet]
         public async Task<IActionResult> GetCategories()
         {
-            var companyId = 1;
-            var categories = await _service.GetCategoriesAsync(companyId);
+ 
+            var categories = await _service.GetCategoriesAsync();
             return Ok(categories);
         }
 

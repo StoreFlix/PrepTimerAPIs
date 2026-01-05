@@ -14,17 +14,18 @@ namespace PrepTimerAPIs.Controllers
     public class ItemController : ControllerBase
     {
         private readonly IItemService _service;
+        private readonly StoreLynkDbProd01Context _context;
 
-        public ItemController(IItemService service)
+        public ItemController(IItemService service, StoreLynkDbProd01Context context)
         {
             _service = service;
+            _context = context;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetItems()
         {
-            var companyId = 1;
-            var categories = await _service.GetItemsAsync(companyId);
+            var categories = await _service.GetItemsAsync();
             return Ok(categories);
         }
 
@@ -77,5 +78,8 @@ namespace PrepTimerAPIs.Controllers
             await _service.CreateTestItem(request);
             return Ok(new { message = "Item added successfully." });
         }
+
+
+      
     }
 }

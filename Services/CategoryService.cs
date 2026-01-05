@@ -18,7 +18,24 @@ namespace PrepTimerAPIs.Services
 
         public async Task<List<CategoryDto>> GetCategoriesAsync(int companyId)
         {
-            var categories = await _context.Ptcategories.Where(a => a.CompanyId == null || a.CompanyId == companyId).ToListAsync();
+            //companyId = GetCompanyIdFromToken();
+            var categories = await _context.Ptcategories.Where(a => a.CompanyId == null || a.CompanyId == companyId || a.CompanyId == 1).ToListAsync();
+            return categories.Select(c => new CategoryDto
+            {
+                CategoryId = c.CategoryId,
+                CategoryName = c.CategoryName,
+                IsDefault = c.CompanyId == null,
+                LastModifiedOn = c.CreatedOn
+
+            }).ToList();
+        }
+
+        public async Task<List<CategoryDto>> GetCategoriesAsync()
+        {
+            int companyId = GetCompanyIdFromToken();
+
+            var categories = await _context.Ptcategories.Where(a => a.CompanyId == null || a.CompanyId == companyId || a.CompanyId == 1).ToListAsync();
+
             return categories.Select(c => new CategoryDto
             {
                 CategoryId = c.CategoryId,

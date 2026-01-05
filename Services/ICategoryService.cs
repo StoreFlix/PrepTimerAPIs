@@ -6,6 +6,8 @@ namespace PrepTimerAPIs.Services
     public interface ICategoryService
     {
         Task<List<CategoryDto>> GetCategoriesAsync(int companyId);
+        Task<List<CategoryDto>> GetCategoriesAsync();
+
         Task AddCategoryAsync(CreateCategoryDto dto);
 
         Task<bool> UpdateCategoryAsync(Ptcategory category);

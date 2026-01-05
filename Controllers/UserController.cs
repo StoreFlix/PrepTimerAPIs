@@ -23,6 +23,9 @@ namespace ServiceFabricAPIsOld.Controllers
         /// </summary>
         private readonly IConfiguration Configuration;
 
+
+        private readonly StoreLynkDbProd01Context _context;
+
         private readonly IUserService _service;
 
         private readonly ICategoryService _ctservice;
@@ -32,12 +35,13 @@ namespace ServiceFabricAPIsOld.Controllers
         /// UserController
         /// </summary>
         /// <param name="_configuration"></param>
-        public UserController(IConfiguration _configuration,IUserService service, ICategoryService ctservice, IItemService itemservice)
+        public UserController(IConfiguration _configuration,IUserService service, ICategoryService ctservice, IItemService itemservice,  StoreLynkDbProd01Context context)
         {
             Configuration = _configuration;
             _service = service;
             _ctservice = ctservice;
             _itemservice = itemservice;
+            _context = context;
         }
 
         [EnableCors("customPolicy")]
@@ -87,8 +91,8 @@ namespace ServiceFabricAPIsOld.Controllers
                     cmd.Parameters.Add("@DeviceType", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceType;
                     cmd.Parameters.Add("@DeviceOS", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceOS;
                     cmd.Parameters.Add("@DeviceIMEI", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceIMEI;
-                    cmd.Parameters.Add("@DeviceModel", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceModel;
-                    cmd.Parameters.Add("@DeviceManufacturer", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceManufacturer;
+                    //cmd.Parameters.Add("@DeviceModel", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceModel;
+                    //cmd.Parameters.Add("@DeviceManufacturer", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceManufacturer;
 
 
 
@@ -111,20 +115,22 @@ namespace ServiceFabricAPIsOld.Controllers
                 var accessToken = tokenSVC.GenerateAccessToken(loginModel.UserDetails.Email);
                 var refreshToken = tokenSVC.GenerateRefreshToken();
 
-                if (loginModel.UserDetails.Email.Contains("antunes"))
-                {
-                    var _translations = await _ctservice.GetTranslations();
-                    var _categories = await _ctservice.GetCategoriesAsync(1);
-                    var _items = await _itemservice.GetItemsAsync(1);
-                    return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
-                }
+                int companyID = GetCompanyIdFromToken(loginModel.UserDetails.Email);
+                //if (loginModel.UserDetails.Email.Contains("antunes"))
+                //{
+                   
+                //    var _translations = await _ctservice.GetTranslations();
+                //    var _categories = await _ctservice.GetCategoriesAsync(companyID);
+                //    var _items = await _itemservice.GetItemsAsync(companyID);
+                //    return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
+                //}
 
-                //var _translations = await _ctservice.GetTranslations();
-                //var _categories = await _ctservice.GetCategoriesAsync(1);
-                //var _items = await _itemservice.GetItemsAsync(1);
+                var _translations = await _ctservice.GetTranslations();
+                var _categories = await _ctservice.GetCategoriesAsync(companyID);
+                var _items = await _itemservice.GetItemsAsync(companyID);
 
-                //return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate= subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
-                return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate });
+                return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate= subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
+                //return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate });
 
             }
 
@@ -230,6 +236,19 @@ namespace ServiceFabricAPIsOld.Controllers
                 return NotFound();
 
             return Ok(result);
+        }
+
+        private int GetCompanyIdFromToken(String Email)
+        {
+            var userDetails = _context.PTUsers.FirstOrDefault(a => a.Email.ToLower().Trim() == Email.ToLower().Trim());
+            if (userDetails == null)
+                throw new UnauthorizedAccessException("CompanyId not found in token.");
+
+            var CompanyId = 1;
+            if (userDetails != null)
+                CompanyId = userDetails.CompanyId.Value;
+
+            return CompanyId;
         }
     }
 }

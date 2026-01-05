@@ -24,10 +24,13 @@ namespace PrepTimerAPIs.Services
 
         public async Task<List<PTItemDto>> GetItemsAsync(int companyId)
         {
+
+            //companyId = GetCompanyIdFromToken();
+
             var items = await _context.PTItems
             .Include(i => i.Translations)
             .Include(i => i.Categories)
-            .Where(i => i.IsActive)
+            .Where(i => i.IsActive &&  (i.CompanyId == 1 || i.CompanyId ==companyId))
             .Select(i => new PTItemDto
             {
                 ItemId = i.ItemId,
@@ -50,6 +53,37 @@ namespace PrepTimerAPIs.Services
 
         }
 
+
+        public async Task<List<PTItemDto>> GetItemsAsync()
+        {
+
+            int companyId = GetCompanyIdFromToken();
+
+            var items = await _context.PTItems
+            .Include(i => i.Translations)
+            .Include(i => i.Categories)
+            .Where(i => i.IsActive && (i.CompanyId == 1 || i.CompanyId == companyId))
+            .Select(i => new PTItemDto
+            {
+                ItemId = i.ItemId,
+                ItemName = i.ItemName,
+                IconName = i.IconName,
+                IconUrl = i.IconUrl,
+                Duration = i.Duration,
+                IsDefault = i.IsDefault,
+                ModifiedOn = i.ModifiedOn,
+                Translations = i.Translations.Select(t => new TranslationDto
+                {
+                    Locale = t.Locale,
+                    ItemName = t.ItemName
+                }).ToList(),
+                Categories = i.Categories.Select(c => c.CategoryId).ToList()
+            })
+            .ToListAsync();
+
+            return items;
+
+        }
         public async Task AddItemAsync(ItemDto dto, IFormFile? ItemIcon)
         {
 

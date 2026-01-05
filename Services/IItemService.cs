@@ -6,6 +6,8 @@ namespace PrepTimerAPIs.Services
     public interface IItemService
     {
         Task<List<PTItemDto>> GetItemsAsync(int companyId);
+        Task<List<PTItemDto>> GetItemsAsync();
+
         Task AddItemAsync(ItemDto dto, IFormFile? ItemIcon);
         Task<bool> UpdateItemAsync(ItemDto dto, IFormFile? ItemIcon);
         Task<bool> DeleteItemAsync(int id);

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Configuration;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-
+using PrepTimerAPIs.Services;
 using ServiceFabricApp.API.Model;
 using ServiceFabricApp.API.Repositories;
 
@@ -36,14 +36,15 @@ namespace ServiceFabricApp.API.Controllers
         /// </summary>
         private readonly IConfiguration Configuration;
 
-
+        private readonly IAppLogger Logger;
         /// <summary>
         /// CustomerController
         /// </summary>
         /// <param name="_configuration"></param>
-        public CustomerController(IConfiguration _configuration)
+        public CustomerController(IConfiguration _configuration,IAppLogger _logger)
         {
             Configuration = _configuration;
+            Logger = _logger;
         }
 
 
@@ -754,6 +755,7 @@ namespace ServiceFabricApp.API.Controllers
             string strEmailPassword = Configuration.GetSection("SMTP")["EmailPassword"];
 
             FusebillSubscriptionResp fusebillSubscriptionResp = new FusebillSubscriptionResp();
+            CustomerRegistrationRequest customerRegistrationRequest = new CustomerRegistrationRequest();
             try
             {
                 var map = new Dictionary<string, string>();
@@ -765,12 +767,14 @@ namespace ServiceFabricApp.API.Controllers
                 int customerId = Convert.ToInt32(HttpContext.Request.Form["FusebillId"]);
                 string strFranchiseCode = Convert.ToString(HttpContext.Request.Form["FranchiseCode"]);
                 double paymentAmount = Convert.ToDouble(HttpContext.Request.Form["PaymentAmount"]);
-                CustomerRegistrationRequest customerRegistrationRequest = new CustomerRegistrationRequest();
+               
                 List<FusebillSubscriptionRequest> fusebillSubscriptionRequest = new List<FusebillSubscriptionRequest>();
                 if (!String.IsNullOrEmpty(HttpContext.Request.Form["CustomerRegistrationRequest"]))
                 {
                     var jsonObjectCustomerRegistrationRequest = HttpContext.Request.Form["CustomerRegistrationRequest"].ToString();
                     customerRegistrationRequest = JsonConvert.DeserializeObject<CustomerRegistrationRequest>(jsonObjectCustomerRegistrationRequest);
+
+                    Logger.LogInfo("Customer Creation", "Started", customerRegistrationRequest, null);
 
                     foreach(var store in customerRegistrationRequest.RegisterStore)
                     {
@@ -785,6 +789,8 @@ namespace ServiceFabricApp.API.Controllers
                 {
                     var jsonObjectFusebillSubscriptionRequest = HttpContext.Request.Form["FusebillSubscriptionRequest"].ToString();
                     fusebillSubscriptionRequest = JsonConvert.DeserializeObject<List<FusebillSubscriptionRequest>>(jsonObjectFusebillSubscriptionRequest);
+
+                    Logger.LogInfo("Customer Creation", "Subscription Started", fusebillSubscriptionRequest, null);
                 }
 
                 string strPassword = string.Empty;
@@ -899,12 +905,14 @@ namespace ServiceFabricApp.API.Controllers
                 }
                 else
                 {
+                    Logger.LogInfo("Customer Creation", "Payment not found", customerRegistrationRequest, fusebillSubscriptionResp);
                     fusebillSubscriptionResp.status = HttpStatusCode.BadRequest;
                     fusebillSubscriptionResp.message = "Payment not found";
                 }
             }
             catch (Exception ex) //Logging the error into file while exception
             {
+                Logger.LogError("Customer Creation", ex, "", customerRegistrationRequest, ex);
                 if (ex.Message.Contains("429"))
                 {
                     fusebillSubscriptionResp.message = "API Rate limit has been exceeded.";
@@ -918,6 +926,7 @@ namespace ServiceFabricApp.API.Controllers
                 Common.WriteLog("CustomerController", "CreateActivateSubscription", ex.Message);
             }
             return fusebillSubscriptionResp;
+        
         }
 
         [EnableCors("customPolicy")]

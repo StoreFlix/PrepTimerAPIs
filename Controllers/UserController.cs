@@ -116,21 +116,13 @@ namespace ServiceFabricAPIsOld.Controllers
                 var refreshToken = tokenSVC.GenerateRefreshToken();
 
                 int companyID = GetCompanyIdFromToken(loginModel.UserDetails.Email);
-                //if (loginModel.UserDetails.Email.Contains("antunes"))
-                //{
-                   
-                //    var _translations = await _ctservice.GetTranslations();
-                //    var _categories = await _ctservice.GetCategoriesAsync(companyID);
-                //    var _items = await _itemservice.GetItemsAsync(companyID);
-                //    return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
-                //}
+               
 
                 var _translations = await _ctservice.GetTranslations();
                 var _categories = await _ctservice.GetCategoriesAsync(companyID);
                 var _items = await _itemservice.GetItemsAsync(companyID);
 
                 return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate= subscriptionEndDate, translations = _translations, categories = _categories, items = _items });
-                //return Ok(new { accessToken = accessToken, refreshToken = refreshToken, subscriptionEndDate = subscriptionEndDate });
 
             }
 
@@ -191,12 +183,14 @@ namespace ServiceFabricAPIsOld.Controllers
             int statusCode = 0;
             string responseMessage = string.Empty;
             DateTime? subscriptionEndDate = null;
+
+            var companyId = await _service.GetCompanyId();
             //Sql Connection to pass request and fetch response  
             using (SqlConnection connection = new SqlConnection(strSqlConnection))
             {
                 var _translations = await _ctservice.GetTranslations();
-                var _categories = await _ctservice.GetCategoriesAsync(1);
-                var _items = await _itemservice.GetItemsAsync(1);
+                var _categories = await _ctservice.GetCategoriesAsync(companyId);
+                var _items = await _itemservice.GetItemsAsync(companyId);
 
                 return Ok(new { translations = _translations, categories = _categories, items = _items });
             }

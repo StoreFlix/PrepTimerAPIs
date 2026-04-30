@@ -13,22 +13,26 @@ namespace PrepTimerAPIs.Services
         private readonly StoreLynkDbProd01Context _context;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public UserService(StoreLynkDbProd01Context context, IConfiguration configuration, IEmailService emailService)
+        public UserService(StoreLynkDbProd01Context context, IConfiguration configuration, IEmailService emailService,IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _configuration = configuration;
             _emailService = emailService;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<List<PTUser>> GetUsersAsync(int companyId)
         {
-            var items = await _context.PTUsers.Where(a => a.CompanyId == null || a.CompanyId == companyId).ToListAsync();
+            var CompanyId = GetCompanyIdFromToken();
+            var items = await _context.PTUsers.Where(a => a.CompanyId == null || a.CompanyId == CompanyId).ToListAsync();
             return items;
         }
 
         public async Task AddUserAsync(UserDto dto)
         {
+            dto.Password = Common.SFF_ENCRYPT(dto.Password);
             var user = new PTUser
             {
                LoginName = dto.Email,
@@ -36,8 +40,8 @@ namespace PrepTimerAPIs.Services
                FirstName = dto.FirstName,
                LastName = dto.LastName,
                Password = dto.Password,
-               Phonenumber =    dto.Password,
-                CompanyId = 1
+               Phonenumber =    dto.PhoneNumber,
+                CompanyId = GetCompanyIdFromToken()
             };
 
             await _context.PTUsers.AddAsync(user);
@@ -45,6 +49,7 @@ namespace PrepTimerAPIs.Services
            
         }
 
+  
         public async Task<bool> UpdateUserAsync(PTUser user)
         {
             var existing = await _context.PTUsers.FindAsync(user.UserId);
@@ -145,6 +150,27 @@ namespace PrepTimerAPIs.Services
             {
                 return "";
             }
+        }
+
+        public async Task<int> GetCompanyId()
+        {
+           return  GetCompanyIdFromToken();
+        }
+
+        private int GetCompanyIdFromToken()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null) throw new UnauthorizedAccessException("User context not found.");
+
+            var claim = user.Claims.FirstOrDefault(c => c.Type == "clientName");
+            if (claim == null) throw new UnauthorizedAccessException("CompanyId not found in token.");
+            var userDetails = _context.PTUsers.FirstOrDefault(a => a.Email.ToLower().Trim() == claim.Value.ToLower().Trim());
+
+            var CompanyId = 1;
+            if (userDetails != null)
+                CompanyId = userDetails.CompanyId.Value;
+
+            return CompanyId;
         }
     }
 }

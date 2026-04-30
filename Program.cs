@@ -15,6 +15,8 @@ builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+
+builder.Services.AddScoped<IAppLogger, AppLogger>();
 // Add services to the container.
 
 var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]);

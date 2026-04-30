@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using PrepTimerAPIs.Model;
+using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 
 namespace PrepTimerAPIs.Models;
 
@@ -16,6 +17,7 @@ public partial class StoreLynkDbProd01Context : DbContext
     {
     }
 
+    public virtual DbSet<AppLog> AppLog { get; set; }
     public virtual DbSet<PtactiveDevice> PtactiveDevices { get; set; }
 
     public virtual DbSet<Ptcategory> Ptcategories { get; set; }
@@ -61,7 +63,13 @@ public partial class StoreLynkDbProd01Context : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
 
-      
+
+        modelBuilder.Entity<AppLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.ToTable("AppLog");
+        });
+
 
         modelBuilder.Entity<PTItem>(entity =>
         {

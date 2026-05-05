@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Cors;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ServiceFabricAPIsOld.Model;
@@ -133,7 +134,7 @@ namespace ServiceFabricAPIsOld.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PTUser>>> GetUsersByCompany()
         {
-            var companyId = 1;
+            var companyId = await _service.GetCompanyId();
             var users = await _service.GetUsersAsync(companyId);
             return Ok(users);
         }
@@ -141,8 +142,19 @@ namespace ServiceFabricAPIsOld.Controllers
         [HttpPost]
         public async Task<ActionResult<IEnumerable<PTUser>>> AddUser([FromBody] UserDto dto)
         {
-           await _service.AddUserAsync(dto);
-            return Ok(new { message = "User added successfully." });
+            try
+            {
+                await _service.AddUserAsync(dto);
+                return Ok(new { message = "User added successfully." });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         // PUT: api/Category/5
@@ -198,26 +210,30 @@ namespace ServiceFabricAPIsOld.Controllers
 
         }
 
+        [AllowAnonymous]
+        [EnableCors("customPolicy")]
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
         {
-            var result = await _service.ResetPasswordAsync(model.Token, model.NewPassword);
+            var result = await _service.ResetPasswordAsync(model?.Token ?? string.Empty, model?.NewPassword ?? string.Empty);
 
             if (!result.IsSuccess)
-                return BadRequest(result.Message);
+                return BadRequest(new { message = result.Message });
 
-            return Ok(result.Message);
+            return Ok(new { message = result.Message });
         }
 
+        [AllowAnonymous]
+        [EnableCors("customPolicy")]
+        [HttpPost("forgot-password")]
         [HttpPost("request-reset-password")]
-        public async Task<IActionResult> RequestResetPassword([FromBody] ResetPasswordRequestDto request)
+        public async Task<IActionResult> ForgotPassword([FromBody] ResetPasswordRequestDto request)
         {
-            var result = await _service.RequestPasswordResetAsync(request.Email);
+            var result = await _service.RequestPasswordResetAsync(request?.Email ?? string.Empty);
 
-            if (!result.IsSuccess)
-                return NotFound(result.Message);
-
-            return Ok(result.Message);
+            // Service returns success even when the email isn't on file, to avoid leaking
+            // account existence. Surface the message as-is.
+            return Ok(new { message = result.Message });
         }
 
         [Route("GetPassword")]

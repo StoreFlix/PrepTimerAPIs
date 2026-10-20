@@ -66,6 +66,28 @@ namespace PrepTimerAPIs.Controllers
         {
             var result = await _service.DeleteItemAsync(id);
 
+            if (result == ItemDeleteResult.NotFound)
+                return NotFound();
+
+            if (result == ItemDeleteResult.Hidden)
+                return Ok(new { message = "Item hidden for your company." });
+
+            return NoContent();
+        }
+
+        // Shared items this company has hidden, for the restore list
+        [HttpGet("Hidden")]
+        public async Task<IActionResult> GetHiddenItems()
+        {
+            var items = await _service.GetHiddenItemsAsync();
+            return Ok(items);
+        }
+
+        [HttpPost("{id}/Restore")]
+        public async Task<IActionResult> RestoreItem(int id)
+        {
+            var result = await _service.RestoreItemAsync(id);
+
             if (!result)
                 return NotFound();
 

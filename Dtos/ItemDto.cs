@@ -10,6 +10,7 @@
         public List<TranslationDto>? Translations { get; set; }
         public int? CompanyId { get; set; }
         public bool IsDefault { get; set; }
+        public bool CanEdit { get; set; }
 
         public string? IconName { get; set; }
         public string? IconUrl { get; set; }
@@ -24,10 +25,19 @@
         public string IconUrl { get; set; }
         public int Duration { get; set; }
         public bool IsDefault { get; set; }
+        // True when the caller's company owns the item; shared items owned by Antunes can only be hidden
+        public bool CanEdit { get; set; }
         public DateTime ModifiedOn { get; set; }
 
         public List<TranslationDto> Translations { get; set; }
         public List<int> Categories { get; set; }
+    }
+
+    public enum ItemDeleteResult
+    {
+        NotFound,
+        Deleted,
+        Hidden
     }
 
     public class TranslationDto

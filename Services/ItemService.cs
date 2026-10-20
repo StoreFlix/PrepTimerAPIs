@@ -5,6 +5,7 @@ using PrepTimerAPIs.Models;
 using PrepTimerAPIs.Dtos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq.Expressions;
 using System.Text.RegularExpressions;
 
 namespace PrepTimerAPIs.Services
@@ -23,67 +24,53 @@ namespace PrepTimerAPIs.Services
             _httpContextAccessor = httpContextAccessor;
         }
 
+        // Shared (CompanyId = 1) items plus the company's own, minus shared items the company has hidden
+        private IQueryable<PTItem> VisibleItems(int companyId) =>
+            _context.PTItems
+            .Where(i => i.IsActive
+                && (i.CompanyId == 1 || i.CompanyId == companyId)
+                && !_context.PTCompanyItemOverrides.Any(o => o.CompanyId == companyId && o.ItemId == i.ItemId && o.IsHidden));
+
+        private static Expression<Func<PTItem, PTItemDto>> ToItemDto(int companyId) => i => new PTItemDto
+        {
+            ItemId = i.ItemId,
+            ItemName = i.ItemName,
+            IconName = i.IconName,
+            IconUrl = i.IconUrl,
+            Duration = i.Duration,
+            IsDefault = i.IsDefault,
+            CanEdit = i.CompanyId == companyId,
+            ModifiedOn = i.ModifiedOn,
+            Translations = i.Translations.Select(t => new TranslationDto
+            {
+                Locale = t.Locale,
+                ItemName = t.ItemName
+            }).ToList(),
+            Categories = i.Categories.Select(c => c.CategoryId).ToList()
+        };
+
         public async Task<List<PTItemDto>> GetItemsAsync(int companyId)
         {
-
-            //companyId = GetCompanyIdFromToken();
-
-            var items = await _context.PTItems
-            .Include(i => i.Translations)
-            .Include(i => i.Categories)
-            .Where(i => i.IsActive &&  (i.CompanyId == 1 || i.CompanyId ==companyId))
-            .Select(i => new PTItemDto
-            {
-                ItemId = i.ItemId,
-                ItemName = i.ItemName,
-                IconName = i.IconName,
-                IconUrl = i.IconUrl,
-                Duration = i.Duration,
-                IsDefault = i.IsDefault,
-                ModifiedOn = i.ModifiedOn,
-                Translations = i.Translations.Select(t => new TranslationDto
-                {
-                    Locale = t.Locale,
-                    ItemName = t.ItemName
-                }).ToList(),
-                Categories = i.Categories.Select(c => c.CategoryId).ToList()
-            })
-            .ToListAsync();
-
-            return items;
-
+            return await VisibleItems(companyId)
+                .Select(ToItemDto(companyId))
+                .ToListAsync();
         }
 
 
         public async Task<List<PTItemDto>> GetItemsAsync()
         {
+            return await GetItemsAsync(GetCompanyIdFromToken());
+        }
 
+        public async Task<List<PTItemDto>> GetHiddenItemsAsync()
+        {
             int companyId = GetCompanyIdFromToken();
 
-            var items = await _context.PTItems
-            .Include(i => i.Translations)
-            .Include(i => i.Categories)
-            .Where(i => i.IsActive && (i.CompanyId == 1 || i.CompanyId == companyId))
-            .Select(i => new PTItemDto
-            {
-                ItemId = i.ItemId,
-                ItemName = i.ItemName,
-                IconName = i.IconName,
-                IconUrl = i.IconUrl,
-                Duration = i.Duration,
-                IsDefault = i.IsDefault,
-                ModifiedOn = i.ModifiedOn,
-                Translations = i.Translations.Select(t => new TranslationDto
-                {
-                    Locale = t.Locale,
-                    ItemName = t.ItemName
-                }).ToList(),
-                Categories = i.Categories.Select(c => c.CategoryId).ToList()
-            })
-            .ToListAsync();
-
-            return items;
-
+            return await _context.PTItems
+                .Where(i => i.IsActive && i.CompanyId == 1
+                    && _context.PTCompanyItemOverrides.Any(o => o.CompanyId == companyId && o.ItemId == i.ItemId && o.IsHidden))
+                .Select(ToItemDto(companyId))
+                .ToListAsync();
         }
         public async Task AddItemAsync(ItemDto dto, IFormFile? ItemIcon)
         {
@@ -146,14 +133,16 @@ namespace PrepTimerAPIs.Services
         {
             int companyId = GetCompanyIdFromToken();
 
-            var item = await _context.PTItems
-                .Where(i => i.ItemId == itemId && (i.CompanyId == 1 || i.CompanyId == companyId) && i.IsActive)
+            var item = await VisibleItems(companyId)
+                .Where(i => i.ItemId == itemId)
                 .Select(i => new ItemDto
                 {
                     ItemId = i.ItemId,
                     Duration = i.Duration,
                     IconUrl = i.IconUrl,
                     IconName = i.IconName,
+                    IsDefault = i.IsDefault,
+                    CanEdit = i.CompanyId == companyId,
                     Categories = _context.PTItemCategoryMapping
                         .Where(m => m.ItemId == i.ItemId)
                         .Select(m => m.CategoryId)
@@ -175,8 +164,11 @@ namespace PrepTimerAPIs.Services
 
         public async Task<bool> UpdateItemAsync(ItemDto dto, IFormFile? ItemIcon)
         {
+            int companyId = GetCompanyIdFromToken();
+
+            // Only the owning company edits an item; shared items are read-only to other companies
             var existing = await _context.PTItems.FindAsync(dto.ItemId);
-            if (existing == null) return false;
+            if (existing == null || existing.CompanyId != companyId) return false;
 
             existing.ItemName = dto.ItemName;
             existing.Duration = dto.Duration;
@@ -235,10 +227,50 @@ namespace PrepTimerAPIs.Services
             return true;
         }
 
-        public async Task<bool> DeleteItemAsync(int id)
+        public async Task<ItemDeleteResult> DeleteItemAsync(int id)
         {
-            var item = await _context.PTItems.FindAsync(id);
-            if (item == null) return false;
+            var (companyId, userId) = GetCallerFromToken();
+
+            var item = await VisibleItems(companyId).FirstOrDefaultAsync(i => i.ItemId == id);
+            if (item == null) return ItemDeleteResult.NotFound;
+
+            // Another company deleting a shared item only hides it for that company
+            if (item.CompanyId == 1 && companyId != 1)
+            {
+                var now = DateTime.UtcNow;
+                var hidden = await _context.PTCompanyItemOverrides.FindAsync(companyId, id);
+                if (hidden == null)
+                {
+                    _context.PTCompanyItemOverrides.Add(new PTCompanyItemOverride
+                    {
+                        CompanyId = companyId,
+                        ItemId = id,
+                        IsHidden = true,
+                        CreatedBy = userId,
+                        CreatedOn = now,
+                        ModifiedBy = userId,
+                        ModifiedOn = now
+                    });
+                }
+                else
+                {
+                    hidden.IsHidden = true;
+                    hidden.ModifiedBy = userId;
+                    hidden.ModifiedOn = now;
+                }
+
+                await _context.SaveChangesAsync();
+                return ItemDeleteResult.Hidden;
+            }
+
+            // Antunes removing a shared item: soft delete so timer history and reports keep it
+            if (item.CompanyId == 1)
+            {
+                item.IsActive = false;
+                item.ModifiedOn = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return ItemDeleteResult.Deleted;
+            }
 
             var mappings = _context.PTItemTranslationMapping
                             .Where(m => m.ItemId == id);
@@ -256,6 +288,29 @@ namespace PrepTimerAPIs.Services
 
 
             _context.PTItems.Remove(item);
+            await _context.SaveChangesAsync();
+            return ItemDeleteResult.Deleted;
+        }
+
+        public async Task<bool> RestoreItemAsync(int id)
+        {
+            var (companyId, userId) = GetCallerFromToken();
+
+            var hidden = await _context.PTCompanyItemOverrides.FindAsync(companyId, id);
+            if (hidden == null || !hidden.IsHidden) return false;
+
+            // Keep the row if it also carries a duration override
+            if (hidden.Duration == null)
+            {
+                _context.PTCompanyItemOverrides.Remove(hidden);
+            }
+            else
+            {
+                hidden.IsHidden = false;
+                hidden.ModifiedBy = userId;
+                hidden.ModifiedOn = DateTime.UtcNow;
+            }
+
             await _context.SaveChangesAsync();
             return true;
         }
@@ -349,7 +404,10 @@ namespace PrepTimerAPIs.Services
             return strUrl;
         }
 
-        private int GetCompanyIdFromToken()
+        private int GetCompanyIdFromToken() => GetCallerFromToken().CompanyId;
+
+        // TODO: a token whose user is not in PTUser falls back to company 1 (Antunes) - confirm how admins are identified
+        private (int CompanyId, int? UserId) GetCallerFromToken()
         {
             var user = _httpContextAccessor.HttpContext?.User;
             if (user == null) throw new UnauthorizedAccessException("User context not found.");
@@ -362,7 +420,7 @@ namespace PrepTimerAPIs.Services
             if (userDetails != null)
                 CompanyId = userDetails.CompanyId.Value;
 
-            return CompanyId;
+            return (CompanyId, userDetails?.UserId);
         }
     }
 }

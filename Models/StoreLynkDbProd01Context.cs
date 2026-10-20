@@ -51,6 +51,7 @@ public partial class StoreLynkDbProd01Context : DbContext
     public virtual DbSet<PTItem> PTItems { get; set; }
     public virtual DbSet<PTItemTranslationMapping> PTItemTranslationMapping { get; set; }
     public virtual DbSet<PTItemCategoryMapping> PTItemCategoryMapping { get; set; }
+    public virtual DbSet<PTCompanyItemOverride> PTCompanyItemOverrides { get; set; }
 
 
 
@@ -87,6 +88,12 @@ public partial class StoreLynkDbProd01Context : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.ToTable("PTItemCategoryMapping");
+        });
+
+        modelBuilder.Entity<PTCompanyItemOverride>(entity =>
+        {
+            entity.HasKey(e => new { e.CompanyId, e.ItemId });
+            entity.ToTable("PTCompanyItemOverride");
         });
         modelBuilder.Entity<PtactiveDevice>(entity =>
         {

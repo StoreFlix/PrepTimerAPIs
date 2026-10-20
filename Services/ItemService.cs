@@ -5,6 +5,7 @@ using PrepTimerAPIs.Models;
 using PrepTimerAPIs.Dtos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace PrepTimerAPIs.Services
 {
@@ -98,12 +99,12 @@ namespace PrepTimerAPIs.Services
                 IsDefault = false,
                 CreatedOn = DateTime.UtcNow,
                 ModifiedOn = DateTime.UtcNow,
-                IsActive = true
+                IsActive = true,
+                IconName = SanitizeIconName(dto.Translations[0].ItemName)
             };
 
             if (dto.icon != null)
             {
-                item.IconName= dto.icon.Name;
                 item.IconUrl = await UpLoadCompanyLogo(dto.icon);
             }
             await _context.PTItems.AddAsync(item);
@@ -146,7 +147,7 @@ namespace PrepTimerAPIs.Services
             int companyId = GetCompanyIdFromToken();
 
             var item = await _context.PTItems
-                .Where(i => i.ItemId == itemId && i.CompanyId == companyId && i.IsActive)
+                .Where(i => i.ItemId == itemId && (i.CompanyId == 1 || i.CompanyId == companyId) && i.IsActive)
                 .Select(i => new ItemDto
                 {
                     ItemId = i.ItemId,
@@ -186,9 +187,10 @@ namespace PrepTimerAPIs.Services
                 existing.ItemName = dto.Translations[0].ItemName;
             }
 
+            existing.IconName = SanitizeIconName(existing.ItemName);
+
             if (dto.icon != null)
             {
-                existing.IconName = ItemIcon.Name;
                 existing.IconUrl = await UpLoadCompanyLogo(dto.icon);
             }
             // If using a separate table for Store mappings, update logic here
@@ -309,6 +311,9 @@ namespace PrepTimerAPIs.Services
 
             return true;
         }
+        private static string SanitizeIconName(string name) =>
+            Regex.Replace(name?.Trim() ?? string.Empty, @"[^a-zA-Z0-9]+", "_").Trim('_');
+
         private async Task<string> UpLoadCompanyLogo(IFormFile ItemIcon)
         {
             string strUrl = string.Empty;

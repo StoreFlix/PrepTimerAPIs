@@ -19,6 +19,7 @@ using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -788,6 +789,8 @@ namespace ServiceFabricApp.API.Controllers
                 if (!String.IsNullOrEmpty(HttpContext.Request.Form["FusebillSubscriptionRequest"]))
                 {
                     var jsonObjectFusebillSubscriptionRequest = HttpContext.Request.Form["FusebillSubscriptionRequest"].ToString();
+
+                    String TestSub=@"";
                     fusebillSubscriptionRequest = JsonConvert.DeserializeObject<List<FusebillSubscriptionRequest>>(jsonObjectFusebillSubscriptionRequest);
 
                     Logger.LogInfo("Customer Creation", "Subscription Started", fusebillSubscriptionRequest, null);
@@ -866,20 +869,20 @@ namespace ServiceFabricApp.API.Controllers
                                 }
                                 foreach (FusebillSubscriptionRequest objFBSReq in fusebillSubscriptionRequest)
                                 {
-                                    bool isAddition = false;
-                                    foreach (SubscriptionProducts objSPs in objFBSReq.subscriptionProducts)
-                                    {
-                                        int planProductUniqueId = objSPs.planProductUniqueId;
-                                        double quantity = objSPs.quantity;
-                                        var subscriptionProductId = customerSubscriptions.Where(t => t.PlanProductUniqueId == planProductUniqueId).Select(n => n.SubscriptionProductId).FirstOrDefault();
-                                        if (subscriptionProductId > 0)
-                                            EditSubscriptionProduct(subscriptionProductId, quantity);
-                                        else
-                                        {
-                                            isAddition = true;
-                                            break;
-                                        }
-                                    }
+                                    bool isAddition = true;
+                                    //foreach (SubscriptionProducts objSPs in objFBSReq.subscriptionProducts)
+                                    //{
+                                    //    int planProductUniqueId = objSPs.planProductUniqueId;
+                                    //    double quantity = objSPs.quantity;
+                                    //    var subscriptionProductId = customerSubscriptions.Where(t => t.PlanProductUniqueId == planProductUniqueId).Select(n => n.SubscriptionProductId).FirstOrDefault();
+                                    //    if (subscriptionProductId > 0)
+                                    //        EditSubscriptionProduct(subscriptionProductId, quantity);
+                                    //    else
+                                    //    {
+                                    //        isAddition = true;
+                                    //        break;
+                                    //    }
+                                    //}
                                     if (isAddition)
                                         CreateNewSubscription(objFBSReq);
                                 }
@@ -920,7 +923,7 @@ namespace ServiceFabricApp.API.Controllers
                 }
                 else
                 {
-                    fusebillSubscriptionResp.message = "Internal server error";
+                    fusebillSubscriptionResp.message = "We've received your payment and are setting up your subscriptions. Please log in again in a few minutes";
                     fusebillSubscriptionResp.status = HttpStatusCode.InternalServerError;
                 }
                 Common.WriteLog("CustomerController", "CreateActivateSubscription", ex.Message);

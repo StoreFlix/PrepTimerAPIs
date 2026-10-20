@@ -92,8 +92,8 @@ namespace ServiceFabricAPIsOld.Controllers
                     cmd.Parameters.Add("@DeviceType", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceType;
                     cmd.Parameters.Add("@DeviceOS", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceOS;
                     cmd.Parameters.Add("@DeviceIMEI", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceIMEI;
-                    //cmd.Parameters.Add("@DeviceModel", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceModel;
-                    //cmd.Parameters.Add("@DeviceManufacturer", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceManufacturer;
+                    cmd.Parameters.Add("@DeviceModel", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceModel;
+                    cmd.Parameters.Add("@DeviceManufacturer", SqlDbType.VarChar).Value = loginModel.DeviceDetails.DeviceManufacturer;
 
 
 

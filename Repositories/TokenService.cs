@@ -10,6 +10,11 @@ namespace ServiceFabricAPIsOld.Repositories
     {
         public const string PasswordResetPurpose = "password_reset";
 
+        // Same signing checks as the default JWT scheme, but expiry is not checked.
+        // Restaurant tablets log in once and stay logged in; use only where the user and
+        // subscription are re-checked in the database (UserService.HasActiveMobileAccess).
+        public const string MobileNoExpiryScheme = "MobileNoExpiry";
+
         /// <summary>
         /// Configuration
         /// </summary>

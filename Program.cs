@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using PrepTimerAPIs.Models;
 using PrepTimerAPIs.Repositories;
 using PrepTimerAPIs.Services;
+using ServiceFabricAPIsOld.Repositories;
 using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,17 @@ builder.Services.AddScoped<IAppLogger, AppLogger>();
 // Add services to the container.
 
 var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]);
+TokenValidationParameters JwtValidation(bool validateLifetime) => new TokenValidationParameters
+{
+    ValidateLifetime = validateLifetime,
+    ValidateIssuer = false,
+    ValidateAudience = false,
+    ValidateIssuerSigningKey = true,
+    ValidIssuer = builder.Configuration["Jwt:Issuer"],
+    ValidAudience = builder.Configuration["Jwt:Audience"],
+    IssuerSigningKey = new SymmetricSecurityKey(key)
+};
+
 builder.Services.AddAuthentication(x =>
 {
     x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -29,16 +41,14 @@ builder.Services.AddAuthentication(x =>
 {
     x.RequireHttpsMetadata = false;
     x.SaveToken = true;
-    x.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateLifetime = true,
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(key)
-    };
+    x.TokenValidationParameters = JwtValidation(validateLifetime: true);
+})
+// Restaurant tablets: accepted only on RefreshPrepTimerData, which re-checks user and subscription
+.AddJwtBearer(TokenService.MobileNoExpiryScheme, x =>
+{
+    x.RequireHttpsMetadata = false;
+    x.SaveToken = true;
+    x.TokenValidationParameters = JwtValidation(validateLifetime: false);
 });
 
 builder.Services.AddCors(options=>

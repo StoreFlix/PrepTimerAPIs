@@ -11,6 +11,7 @@ namespace PrepTimerAPIs.Services
         Task<bool> DeleteUserAsync(int id);
         Task<String> HashPassword(string password);
         Task<int> GetCompanyId();
+        Task<bool> HasActiveMobileAccess();
 
         Task<ResponseResult> RequestPasswordResetAsync(string email);
         Task<ResponseResult> ResetPasswordAsync(string token, string newPassword);

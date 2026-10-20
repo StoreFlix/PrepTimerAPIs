@@ -215,6 +215,21 @@ namespace PrepTimerAPIs.Services
            return  GetCompanyIdFromToken();
         }
 
+        // Stands in for token expiry on tablet calls: the user must exist and be active, and the
+        // company must hold a subscription that hasn't expired (same rule as PT_ValidateSubscriptions)
+        public async Task<bool> HasActiveMobileAccess()
+        {
+            var claim = _httpContextAccessor.HttpContext?.User.Claims.FirstOrDefault(c => c.Type == "clientName");
+            if (claim == null) return false;
+
+            var email = claim.Value.ToLower().Trim();
+            var user = await _context.PTUsers.FirstOrDefaultAsync(a => a.Email.ToLower().Trim() == email);
+            if (user == null || user.IsActive == false || user.CompanyId == null) return false;
+
+            return await _context.PtcustomerSubscriptions
+                .AnyAsync(s => s.CompanyId == user.CompanyId && s.ExpiryDate > DateTime.Now);
+        }
+
         private int GetCompanyIdFromToken()
         {
             var user = _httpContextAccessor.HttpContext?.User;

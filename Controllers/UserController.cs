@@ -185,7 +185,10 @@ namespace ServiceFabricAPIsOld.Controllers
         }
 
 
+        // Tablets log in once and keep using the app, so an expired token is accepted here;
+        // the user and subscription are checked in the database instead
         [EnableCors("customPolicy")]
+        [Authorize(AuthenticationSchemes = TokenService.MobileNoExpiryScheme)]
         [Route("RefreshPrepTimerData")]
         [HttpGet]
         public async Task<ActionResult> RefreshPrepTimerData()
@@ -195,6 +198,9 @@ namespace ServiceFabricAPIsOld.Controllers
             int statusCode = 0;
             string responseMessage = string.Empty;
             DateTime? subscriptionEndDate = null;
+
+            if (!await _service.HasActiveMobileAccess())
+                return Unauthorized(new { message = "Your login or subscription is no longer active. Please log in again." });
 
             var companyId = await _service.GetCompanyId();
             //Sql Connection to pass request and fetch response  
